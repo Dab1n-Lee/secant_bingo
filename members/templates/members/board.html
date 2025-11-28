@@ -1,0 +1,188 @@
+{% extends "members/base.html" %}
+{% block title %}빙고판{% endblock %}
+{% block extra_head %}
+<style>
+    .board-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .board-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .tile { position: relative; background: rgba(255,255,255,0.9); border: 1px solid #dfe8fa; border-radius: 16px; padding: 14px; box-shadow: 0 10px 26px rgba(20,40,100,0.08); min-height: 120px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease; }
+    .tile:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(20,40,100,0.12); }
+    .tile strong { color: #183973; }
+    .empty { text-align: center; color: #667799; padding: 40px 0; }
+    .status-pill { align-self: flex-start; padding: 6px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; color: #fff; }
+    .status-approved { background: linear-gradient(120deg, #1aa65a, #29c77b); }
+    .status-pending { background: linear-gradient(120deg, #f7a000, #f77f00); }
+    .tile.pending { border-color: #ffd599; background: #fff7ea; }
+    .tile.approved { border-color: #b8e5cb; background: #f0fff6; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(8,19,46,0.45); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+    .modal { width: min(680px, 100%); background: #fff; border-radius: 18px; box-shadow: 0 20px 50px rgba(8,24,68,0.3); padding: 22px; position: relative; }
+    .modal h3 { margin: 0 0 6px; }
+    .modal .subtitle { margin: 0 0 12px; }
+    .modal-close { position: absolute; top: 12px; right: 12px; border: none; background: none; font-size: 20px; cursor: pointer; color: #4c5a78; }
+    .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    label { font-weight: 700; margin-bottom: 4px; display: block; }
+    input[type="text"], textarea { width: 100%; border-radius: 12px; border: 1px solid #cdd6eb; padding: 12px 14px; font-size: 15px; background: #f7f9ff; }
+    textarea { min-height: 120px; resize: vertical; }
+    input[type="file"] { margin-top: 6px; }
+    .participants { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+    .participant { background: #f4f6ff; border: 1px solid #d7def7; border-radius: 12px; padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
+    .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+    .btn { border: none; border-radius: 12px; padding: 12px 14px; font-weight: 800; cursor: pointer; }
+    .btn-secondary { background: #e8edfb; color: #1c2f58; }
+    .btn-primary { background: linear-gradient(120deg, #163a8c, #3572ff); color: #fff; box-shadow: 0 10px 20px rgba(34,78,181,0.2); }
+    .error-block { color: #c62828; font-size: 13px; }
+    .confetti-piece { position: fixed; width: 10px; height: 16px; background: var(--confetti-color); top: -20px; animation: fall 2.6s linear forwards; z-index: 60; }
+    @keyframes fall { to { transform: translateY(110vh) rotate(360deg); opacity: 0.2; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="board-header">
+        <div>
+            <h1 style="margin: 0;">{{ member.name }}님의 빙고판</h1>
+            <p class="subtitle">{{ member.get_team_display }} · 학번 {{ member.student_id }}</p>
+        </div>
+        <a href="{% url 'logout' %}" class="button-link">로그아웃</a>
+    </div>
+
+    {% if form_errors %}
+        <div class="error-block">제출 중 오류가 있습니다: {{ form_errors|striptags }}</div>
+    {% endif %}
+
+    {% if board_data %}
+        <div class="board-grid">
+            {% for item, submission in board_data %}
+                {% with status=submission.status|default_if_none:"" %}
+                <div class="tile {% if status == 'pending' %}pending{% elif status == 'approved' %}approved{% endif %}"
+                     data-item-id="{{ item.id }}"
+                     data-title="{{ item.title }}"
+                     data-desc="{{ item.description|default_if_none:'' }}"
+                     data-status="{{ status|default:'new' }}">
+                    <div style="font-size: 13px; color: #7c89a8;">#{{ item.position }}</div>
+                    <strong>{{ item.title }}</strong>
+                    {% if item.description %}
+                        <div style="color: #607099; font-size: 14px; line-height: 1.5;">{{ item.description }}</div>
+                    {% endif %}
+                    {% if status %}
+                        <span class="status-pill status-{{ status }}">
+                            {% if status == "pending" %}검토중{% else %}승인됨{% endif %}
+                        </span>
+                    {% endif %}
+                </div>
+                {% endwith %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty">
+            아직 등록된 빙고 아이템이 없습니다. 관리자 페이지에서 내용을 채워주세요.
+        </div>
+    {% endif %}
+</div>
+
+<div class="modal-backdrop" id="submission-backdrop">
+    <div class="modal">
+        <button class="modal-close" type="button" id="modal-close">×</button>
+        <h3 id="modal-title">활동 인증</h3>
+        <p class="subtitle" id="modal-desc"></p>
+        <form id="submission-form" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-grid">
+                <div>
+                    <label for="title-input">활동 제목</label>
+                    <input type="text" id="title-input" name="title" required>
+                </div>
+                <div>
+                    <label for="content-input">활동 내용</label>
+                    <textarea id="content-input" name="content" required></textarea>
+                </div>
+                <div>
+                    <label for="photo-input">사진 업로드 (필수)</label>
+                    <input type="file" id="photo-input" name="photo" accept="image/*" required>
+                </div>
+                <div>
+                    <label>참가 팀원 (본인 제외, 최소 3명 체크)</label>
+                    <div class="participants">
+                        {% for teammate in team_members %}
+                            {% if teammate.id != member.id %}
+                            <label class="participant">
+                                <input type="checkbox" name="participants" value="{{ teammate.id }}">
+                                <span>{{ teammate.name }}</span>
+                            </label>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div class="helper">본인을 포함해 4명 이상이어야 인정됩니다.</div>
+                </div>
+            </div>
+            <div class="actions">
+                <button type="button" class="btn btn-secondary" id="cancel-btn">취소</button>
+                <button type="submit" class="btn btn-primary">제출하기</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const tiles = document.querySelectorAll('.tile');
+    const backdrop = document.getElementById('submission-backdrop');
+    const modalTitle = document.getElementById('modal-title');
+    const modalDesc = document.getElementById('modal-desc');
+    const form = document.getElementById('submission-form');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const closeBtn = document.getElementById('modal-close');
+    const pendingMessage = "검토중입니다. 스토리에 cogsciin 태그 후, 문화부장에게 갠톡을 하셨다면, 잠시만 기다려주세요!";
+    const confirmMessage = "인스타그램에 cogsciin 을 태그해서 인증샷 스토리로 올려주시고 문화부장에게 확인 요청 하시면 바로 승인해드리겠습니다!";
+
+    function openModal(title, desc, actionUrl) {
+        modalTitle.textContent = title;
+        modalDesc.textContent = desc || "활동 내용을 작성하고 팀원들을 체크해주세요.";
+        form.action = actionUrl;
+        form.reset();
+        backdrop.style.display = 'flex';
+    }
+    function closeModal() { backdrop.style.display = 'none'; }
+
+    tiles.forEach(tile => {
+        tile.addEventListener('click', () => {
+            const status = tile.dataset.status;
+            if (status === 'pending') { alert(pendingMessage); return; }
+            if (status === 'approved') { return; }
+            const itemId = tile.dataset.itemId;
+            const title = tile.dataset.title;
+            const desc = tile.dataset.desc;
+            openModal(title, desc, `{% url 'submit_bingo_item' 0 %}`.replace('/0/', `/${itemId}/`));
+        });
+    });
+
+    cancelBtn.addEventListener('click', closeModal);
+    closeBtn.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+
+    form.addEventListener('submit', (e) => {
+        const checked = form.querySelectorAll('input[name="participants"]:checked').length;
+        if (checked < 3) {
+            e.preventDefault();
+            alert("팀원 최소 3명을 선택해주세요. (본인 포함 4명 이상)");
+            return;
+        }
+        if (!confirm(confirmMessage)) { e.preventDefault(); }
+    });
+
+    {% if completed %}
+    (function confetti() {
+        const colors = ["#ff5f6d", "#ffc371", "#2af598", "#22d3ee", "#a78bfa"];
+        for (let i = 0; i < 80; i++) {
+            const el = document.createElement('div');
+            el.className = 'confetti-piece';
+            el.style.left = Math.random() * 100 + 'vw';
+            el.style.setProperty('--confetti-color', colors[i % colors.length]);
+            el.style.animationDelay = (Math.random() * 0.5) + 's';
+            el.style.transform = `rotate(${Math.random() * 360}deg)`;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 3000);
+        }
+        alert("빙고가 완성되었습니다!");
+    })();
+    {% endif %}
+</script>
+{% endblock %}

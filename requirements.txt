@@ -1,0 +1,7 @@
+asgiref==3.11.0
+Django==5.2.8
+django-froala-editor==4.7.1
+setuptools==80.9.0
+sqlparse==0.5.3
+tzdata==2025.2
+wheel==0.45.1

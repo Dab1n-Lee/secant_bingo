@@ -1,0 +1,56 @@
+{% extends "members/base.html" %}
+{% block title %}로그인{% endblock %}
+{% block extra_head %}
+<style>
+    .login-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 14px; }
+    form label { display: block; font-weight: 700; margin-bottom: 6px; }
+    input[type="text"] { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #cdd6eb; font-size: 15px; background: #f7f9ff; }
+    button[type="submit"] { width: 100%; margin-top: 12px; padding: 13px; border: none; border-radius: 12px; background: linear-gradient(120deg, #163a8c, #3572ff); color: #fff; font-weight: 800; letter-spacing: 0.3px; cursor: pointer; box-shadow: 0 10px 20px rgba(34, 78, 181, 0.2); }
+    .pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; background: #eef3ff; color: #14325d; font-size: 13px; font-weight: 700; margin-right: 8px; }
+    .teams { display: flex; flex-wrap: wrap; gap: 8px; }
+    .helper { font-size: 13px; color: #607099; margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1 style="margin: 0;">Secant Bingo에 오신 것을 환영합니다</h1>
+    <p class="subtitle">
+        친목 · 교류 · 학술이 균형을 이루는 CogSci:IN의 빙고. 학번과 전화번호 뒷자리로 간단히 확인 후 입장합니다.
+    </p>
+    <div class="login-grid">
+        <form method="post">
+            {% csrf_token %}
+            <label for="{{ form.student_id.id_for_label }}">학번</label>
+            {{ form.student_id }}
+            {% if form.student_id.errors %}
+                <div class="helper">{{ form.student_id.errors|striptags }}</div>
+            {% endif %}
+
+            <label for="{{ form.phone_last4.id_for_label }}" style="margin-top: 12px;">전화번호 뒷자리</label>
+            {{ form.phone_last4 }}
+            {% if form.phone_last4.errors %}
+                <div class="helper">{{ form.phone_last4.errors|striptags }}</div>
+            {% endif %}
+
+            {% if form.non_field_errors %}
+                <div class="helper">{{ form.non_field_errors|striptags }}</div>
+            {% endif %}
+
+            <button type="submit">로그인</button>
+        </form>
+        <div class="card" style="background: #0f1a2d; color: #e6edff; border: none;">
+            <h2 style="margin-top: 0; color: #fff;">Secant 팀 소개</h2>
+            <p style="color: #c9d6ff;">세컨트는 Cosine의 역함수처럼, 서로 다른 세 집단이 만나는 지점에서 빙고가 완성됩니다.</p>
+            <div class="teams">
+                <span class="pill">액티비티조</span>
+                <span class="pill">문화탐방조</span>
+                <span class="pill">맛집탐방조</span>
+            </div>
+            <p class="helper" style="color: #95a8dd; margin-top: 12px;">
+                관리자 페이지에서 학회원 정보와 빙고 아이템을 입력해주세요. 로그인 후 바로 빙고판을 확인할 수 있습니다.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
