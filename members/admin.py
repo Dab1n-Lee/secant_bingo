@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BingoItem, BingoSubmission, Member
+from .models import BingoItem, BingoSubmission, BingoSubmissionAttachment, Member
 
 
 @admin.register(Member)
@@ -18,6 +18,12 @@ class BingoItemAdmin(admin.ModelAdmin):
     search_fields = ("title", "description")
 
 
+class BingoSubmissionAttachmentInline(admin.TabularInline):
+    model = BingoSubmissionAttachment
+    extra = 0
+    readonly_fields = ("uploaded_at",)
+
+
 @admin.register(BingoSubmission)
 class BingoSubmissionAdmin(admin.ModelAdmin):
     list_display = ("bingo_item", "team", "status", "submitted_by", "created_at")
@@ -25,6 +31,7 @@ class BingoSubmissionAdmin(admin.ModelAdmin):
     search_fields = ("title", "content", "submitted_by__name")
     autocomplete_fields = ("submitted_by", "participants", "bingo_item")
     actions = ["approve_selected"]
+    inlines = (BingoSubmissionAttachmentInline,)
 
     @admin.action(description="승인 처리")
     def approve_selected(self, request, queryset):

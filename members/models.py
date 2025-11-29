@@ -92,7 +92,7 @@ class BingoSubmission(models.Model):
     )
     title = models.CharField(max_length=100)
     content = models.TextField()
-    photo = models.FileField(upload_to="bingo_photos/")
+    photo = models.FileField(upload_to="bingo_photos/", null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -118,3 +118,29 @@ class BingoSubmission(models.Model):
 
     def __str__(self) -> str:
         return f"{self.get_team_display()} - {self.bingo_item.title} ({self.get_status_display()})"
+
+
+class BingoSubmissionAttachment(models.Model):
+    submission = models.ForeignKey(
+        BingoSubmission,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+    file = models.FileField(upload_to="bingo_attachments/")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return f"{self.submission_id} - {self.filename}"
+
+    @property
+    def filename(self) -> str:
+        return self.file.name.split("/")[-1]
+
+    @property
+    def kind(self) -> str:
+        name = self.filename.lower()
+        if any(name.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic", ".heif"]):
+            return "image"
+        if any(name.endswith(ext) for ext in [".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"]):
+            return "video"
+        return "other"

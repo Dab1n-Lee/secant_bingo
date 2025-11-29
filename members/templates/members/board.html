@@ -29,8 +29,26 @@
     .btn { border: none; border-radius: 12px; padding: 12px 14px; font-weight: 800; cursor: pointer; }
     .btn-secondary { background: #e8edfb; color: #1c2f58; }
     .btn-primary { background: linear-gradient(120deg, #163a8c, #3572ff); color: #fff; box-shadow: 0 10px 20px rgba(34,78,181,0.2); }
+    .btn-danger { background: linear-gradient(120deg, #f05f57, #e53935); color: #fff; }
     .error-block { color: #c62828; font-size: 13px; }
     .confetti-piece { position: fixed; width: 10px; height: 16px; background: var(--confetti-color); top: -20px; animation: fall 2.6s linear forwards; z-index: 60; }
+    .helper { color: #7a869f; font-size: 13px; margin-top: 4px; }
+    .modal-section { display: none; }
+    .modal-section.active { display: block; }
+    .section-title { font-size: 14px; font-weight: 800; color: #1f2f55; margin: 14px 0 6px; }
+    .attachment-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 6px; }
+    .attachment-card { border: 1px solid #dfe5f5; border-radius: 12px; overflow: hidden; background: #f7f9ff; position: relative; }
+    .attachment-thumb { width: 100%; height: 120px; object-fit: cover; display: block; background: #e6ecfa; }
+    .attachment-meta { padding: 8px; font-size: 12px; color: #4d5a75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #fff; }
+    .pill.pending { background: linear-gradient(120deg, #f7a000, #f77f00); }
+    .participant-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
+    .participant-chip { background: #eef2ff; color: #2a3f7c; padding: 6px 10px; border-radius: 12px; font-weight: 700; font-size: 13px; }
+    .drop-zone { border: 2px dashed #b5c6f3; border-radius: 14px; padding: 14px; text-align: center; background: #f5f7ff; transition: border-color .12s ease, background .12s ease; cursor: pointer; }
+    .drop-zone.dragover { border-color: #2f6bff; background: #e9f0ff; }
+    .drop-actions { display: flex; justify-content: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+    .btn-ghost { border: 1px dashed #2f6bff; background: #fff; color: #1b3a7a; }
+    .remove-chip { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-weight: 800; }
     @keyframes fall { to { transform: translateY(110vh) rotate(360deg); opacity: 0.2; } }
 </style>
 {% endblock %}
@@ -55,6 +73,7 @@
                 {% with status=submission.status|default_if_none:"" %}
                 <div class="tile {% if status == 'pending' %}pending{% elif status == 'approved' %}approved{% endif %}"
                      data-item-id="{{ item.id }}"
+                     data-submission-id="{{ submission.id|default_if_none:'' }}"
                      data-title="{{ item.title }}"
                      data-desc="{{ item.description|default_if_none:'' }}"
                      data-status="{{ status|default:'new' }}">
@@ -84,7 +103,21 @@
         <button class="modal-close" type="button" id="modal-close">×</button>
         <h3 id="modal-title">활동 인증</h3>
         <p class="subtitle" id="modal-desc"></p>
-        <form id="submission-form" method="post" enctype="multipart/form-data">
+        <div id="pending-detail" class="modal-section">
+            <span class="pill pending">검토중</span>
+            <div class="section-title">내가 제출한 내용</div>
+            <div id="detail-content" style="white-space: pre-wrap; line-height: 1.5; color: #1f2f55;"></div>
+            <div class="section-title">첨부한 파일</div>
+            <div id="detail-attachments" class="attachment-grid"></div>
+            <div class="section-title">함께한 팀원</div>
+            <div class="participant-list" id="detail-participants"></div>
+            <div class="actions">
+                <button type="button" class="btn btn-secondary" id="detail-edit-btn">수정하기</button>
+                <button type="button" class="btn btn-danger" id="detail-cancel-btn">등록 취소</button>
+            </div>
+        </div>
+
+        <form id="submission-form" class="modal-section" method="post" enctype="multipart/form-data">
             {% csrf_token %}
             <div class="form-grid">
                 <div>
@@ -96,8 +129,19 @@
                     <textarea id="content-input" name="content" required></textarea>
                 </div>
                 <div>
-                    <label for="photo-input">사진 업로드 (필수)</label>
-                    <input type="file" id="photo-input" name="photo" accept="image/*" required>
+                    <label for="attachments-input">사진/동영상 첨부 (최대 5개)</label>
+                    <div class="drop-zone" id="drop-zone">
+                        파일을 드래그 앤 드랍하거나, 아래 버튼을 눌러 추가하세요.
+                        <div class="drop-actions">
+                            <button type="button" class="btn btn-ghost" id="file-select-btn">파일 첨부</button>
+                        </div>
+                        <input type="file" id="attachments-input" name="attachments" accept="image/*,video/*" multiple style="display:none;">
+                    </div>
+                    <div class="helper">사진/영상만 업로드 가능하며 최대 5개까지 첨부할 수 있습니다.</div>
+                    <div class="section-title" id="existing-attachments-title" style="display: none; margin-bottom: 4px;">현재 첨부된 파일</div>
+                    <div id="existing-attachments" class="attachment-grid"></div>
+                    <div class="section-title" style="margin-bottom: 4px;">선택한 파일 미리보기</div>
+                    <div id="attachment-previews" class="attachment-grid"></div>
                 </div>
                 <div>
                     <label>참가 팀원 (본인 제외, 최소 3명 체크)</label>
@@ -115,48 +159,290 @@
                 </div>
             </div>
             <div class="actions">
-                <button type="button" class="btn btn-secondary" id="cancel-btn">취소</button>
-                <button type="submit" class="btn btn-primary">제출하기</button>
+                <button type="button" class="btn btn-secondary" id="cancel-btn">닫기</button>
+                <button type="submit" class="btn btn-primary" id="submit-btn-text">제출하기</button>
             </div>
         </form>
+        <form id="cancel-form" method="post" style="display: none;">{% csrf_token %}</form>
     </div>
 </div>
 
+{{ submission_details|json_script:"submission-data" }}
+
 <script>
+    const submissionData = JSON.parse(document.getElementById('submission-data').textContent || "{}");
+    const currentMemberId = {{ member.id }};
     const tiles = document.querySelectorAll('.tile');
     const backdrop = document.getElementById('submission-backdrop');
     const modalTitle = document.getElementById('modal-title');
     const modalDesc = document.getElementById('modal-desc');
     const form = document.getElementById('submission-form');
+    const formSection = document.getElementById('submission-form');
+    const detailSection = document.getElementById('pending-detail');
     const cancelBtn = document.getElementById('cancel-btn');
     const closeBtn = document.getElementById('modal-close');
-    const pendingMessage = "검토중입니다. 스토리에 cogsciin 태그 후, 문화부장에게 갠톡을 하셨다면, 잠시만 기다려주세요!";
+    const detailContent = document.getElementById('detail-content');
+    const detailAttachments = document.getElementById('detail-attachments');
+    const detailParticipants = document.getElementById('detail-participants');
+    const detailEditBtn = document.getElementById('detail-edit-btn');
+    const detailCancelBtn = document.getElementById('detail-cancel-btn');
+    const cancelForm = document.getElementById('cancel-form');
+    const attachmentInput = document.getElementById('attachments-input');
+    const attachmentPreviews = document.getElementById('attachment-previews');
+    const existingAttachments = document.getElementById('existing-attachments');
+    const existingAttachmentsTitle = document.getElementById('existing-attachments-title');
+    const submitBtn = document.getElementById('submit-btn-text');
+    const dropZone = document.getElementById('drop-zone');
+    const fileSelectBtn = document.getElementById('file-select-btn');
     const confirmMessage = "인스타그램에 cogsciin 을 태그해서 인증샷 스토리로 올려주시고 문화부장에게 확인 요청 하시면 바로 승인해드리겠습니다!";
 
-    function openModal(title, desc, actionUrl) {
+    let activeItemId = null;
+    let activeSubmissionId = null;
+    let currentDetail = null;
+    let fileQueue = [];
+
+    function showSection(target) {
+        [formSection, detailSection].forEach(section => section.classList.remove('active'));
+        target.classList.add('active');
+    }
+
+    function setParticipants(ids) {
+        const boxes = form.querySelectorAll('input[name="participants"]');
+        boxes.forEach(box => { box.checked = ids.includes(parseInt(box.value, 10)); });
+    }
+
+    function renderAttachments(container, attachments) {
+        container.innerHTML = '';
+        if (!attachments || !attachments.length) {
+            container.innerHTML = '<div class="helper">첨부된 파일이 없습니다.</div>';
+            return;
+        }
+        attachments.forEach(att => {
+            const card = document.createElement('div');
+            card.className = 'attachment-card';
+            if (att.kind === 'image') {
+                const img = document.createElement('img');
+                img.src = att.url;
+                img.alt = att.name;
+                img.className = 'attachment-thumb';
+                card.appendChild(img);
+            } else if (att.kind === 'video') {
+                const video = document.createElement('video');
+                video.src = att.url;
+                video.controls = true;
+                video.muted = true;
+                video.className = 'attachment-thumb';
+                card.appendChild(video);
+            }
+            const meta = document.createElement('div');
+            meta.className = 'attachment-meta';
+            meta.textContent = att.name;
+            card.appendChild(meta);
+            container.appendChild(card);
+        });
+    }
+
+    function renderSelectedPreviews(files) {
+        attachmentPreviews.innerHTML = '';
+        if (!files.length) {
+            attachmentPreviews.innerHTML = '<div class="helper">선택된 파일이 없습니다.</div>';
+            return;
+        }
+        files.forEach((file, idx) => {
+            if (!(file.type.startsWith('image/') || file.type.startsWith('video/'))) return;
+            const card = document.createElement('div');
+            card.className = 'attachment-card';
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'remove-chip';
+            remove.textContent = '×';
+            remove.addEventListener('click', () => {
+                fileQueue = fileQueue.filter((_, i) => i !== idx);
+                syncInputFiles();
+                renderSelectedPreviews(fileQueue);
+            });
+            if (file.type.startsWith('image/')) {
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                img.className = 'attachment-thumb';
+                img.onload = () => URL.revokeObjectURL(img.src);
+                card.appendChild(img);
+            } else {
+                const video = document.createElement('video');
+                video.src = URL.createObjectURL(file);
+                video.className = 'attachment-thumb';
+                video.muted = true;
+                video.controls = true;
+                video.onloadeddata = () => URL.revokeObjectURL(video.src);
+                card.appendChild(video);
+            }
+            const meta = document.createElement('div');
+            meta.className = 'attachment-meta';
+            meta.textContent = file.name;
+            card.appendChild(meta);
+            card.appendChild(remove);
+            attachmentPreviews.appendChild(card);
+        });
+    }
+
+    function syncInputFiles() {
+        const dt = new DataTransfer();
+        fileQueue.forEach(f => dt.items.add(f));
+        attachmentInput.files = dt.files;
+    }
+
+    function addFiles(files) {
+        const newFiles = [];
+        const existingCount = parseInt(form.dataset.existingCount || '0', 10);
+        let skippedType = false;
+        let skippedCount = false;
+        files.forEach(f => {
+            if (!(f.type.startsWith('image/') || f.type.startsWith('video/'))) { skippedType = true; return; }
+            const total = existingCount + fileQueue.length + newFiles.length + 1;
+            if (total > 5) { skippedCount = true; return; }
+            newFiles.push(f);
+        });
+        if (skippedType) { alert("사진 또는 동영상 파일만 첨부할 수 있습니다."); }
+        if (skippedCount) { alert("첨부 파일은 최대 5개까지만 가능합니다."); }
+        if (newFiles.length === 0) { return; }
+        fileQueue = fileQueue.concat(newFiles);
+        syncInputFiles();
+        renderSelectedPreviews(fileQueue);
+    }
+
+    function closeModal() {
+        backdrop.style.display = 'none';
+        form.reset();
+        fileQueue = [];
+        syncInputFiles();
+        renderSelectedPreviews([]);
+        existingAttachments.innerHTML = '';
+        existingAttachmentsTitle.style.display = 'none';
+        currentDetail = null;
+        activeItemId = null;
+        activeSubmissionId = null;
+    }
+
+    function openForm(itemId, title, desc, mode = 'create', data = null) {
+        form.reset();
+        setParticipants([]);
+        activeItemId = itemId;
+        activeSubmissionId = data && data.id ? data.id : null;
         modalTitle.textContent = title;
         modalDesc.textContent = desc || "활동 내용을 작성하고 팀원들을 체크해주세요.";
-        form.action = actionUrl;
-        form.reset();
+        form.dataset.mode = mode;
+        form.dataset.existingCount = mode === 'edit' && data ? (data.attachments || []).length : 0;
+        fileQueue = [];
+        syncInputFiles();
+        renderSelectedPreviews([]);
+        existingAttachments.innerHTML = '';
+        if (mode === 'create') {
+            form.action = `{% url 'submit_bingo_item' 0 %}`.replace('/0/', `/${itemId}/`);
+            submitBtn.textContent = "제출하기";
+            existingAttachmentsTitle.style.display = 'none';
+        } else if (data) {
+            form.action = `{% url 'update_submission' 0 %}`.replace('/0/', `/${data.id}/`);
+            document.getElementById('title-input').value = data.title;
+            document.getElementById('content-input').value = data.content;
+            setParticipants(data.participant_ids || []);
+            renderAttachments(existingAttachments, data.attachments || []);
+            existingAttachmentsTitle.style.display = (data.attachments || []).length ? 'block' : 'none';
+            submitBtn.textContent = "수정 완료";
+        }
+        showSection(formSection);
         backdrop.style.display = 'flex';
     }
-    function closeModal() { backdrop.style.display = 'none'; }
+
+    function openDetail(itemId, data) {
+        activeItemId = itemId;
+        activeSubmissionId = data.id;
+        currentDetail = data;
+        const isOwner = data.submitted_by_id === currentMemberId;
+        modalTitle.textContent = data.item_title;
+        modalDesc.textContent = data.item_desc || "제출한 내용을 확인할 수 있습니다.";
+        detailContent.textContent = data.content;
+        renderAttachments(detailAttachments, data.attachments || []);
+        detailParticipants.innerHTML = '';
+        (data.participants || []).forEach(name => {
+            const chip = document.createElement('span');
+            chip.className = 'participant-chip';
+            chip.textContent = name;
+            detailParticipants.appendChild(chip);
+        });
+        if (!detailParticipants.children.length) {
+            detailParticipants.innerHTML = '<div class="helper">함께한 팀원이 없습니다.</div>';
+        }
+        detailEditBtn.style.display = isOwner ? 'inline-flex' : 'none';
+        detailCancelBtn.style.display = isOwner ? 'inline-flex' : 'none';
+        showSection(detailSection);
+        backdrop.style.display = 'flex';
+    }
+
+    function getSubmission(itemId) {
+        return submissionData[itemId] || submissionData[String(itemId)] || null;
+    }
 
     tiles.forEach(tile => {
         tile.addEventListener('click', () => {
             const status = tile.dataset.status;
-            if (status === 'pending') { alert(pendingMessage); return; }
-            if (status === 'approved') { return; }
             const itemId = tile.dataset.itemId;
-            const title = tile.dataset.title;
-            const desc = tile.dataset.desc;
-            openModal(title, desc, `{% url 'submit_bingo_item' 0 %}`.replace('/0/', `/${itemId}/`));
+            if (status === 'pending') {
+                const data = getSubmission(itemId);
+                if (data) {
+                    openDetail(itemId, data);
+                } else {
+                    alert("제출 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.");
+                }
+                return;
+            }
+            if (status === 'approved') { return; }
+            openForm(itemId, tile.dataset.title, tile.dataset.desc, 'create');
         });
     });
 
     cancelBtn.addEventListener('click', closeModal);
     closeBtn.addEventListener('click', closeModal);
     backdrop.addEventListener('click', (e) => { if (e.target === backdrop) closeModal(); });
+
+    detailEditBtn.addEventListener('click', () => {
+        if (!currentDetail) return;
+        openForm(activeItemId, currentDetail.item_title, currentDetail.item_desc, 'edit', currentDetail);
+    });
+
+    detailCancelBtn.addEventListener('click', () => {
+        if (!activeSubmissionId) return;
+        if (!confirm("등록을 취소할까요? 첨부 파일과 내용이 모두 삭제됩니다.")) return;
+        cancelForm.action = `{% url 'cancel_submission' 0 %}`.replace('/0/', `/${activeSubmissionId}/`);
+        cancelForm.submit();
+    });
+
+    fileSelectBtn.addEventListener('click', () => attachmentInput.click());
+
+    attachmentInput.addEventListener('change', () => {
+        const files = Array.from(attachmentInput.files || []);
+        addFiles(files);
+        attachmentInput.value = '';
+    });
+
+    ['dragenter', 'dragover'].forEach(ev => {
+        dropZone.addEventListener(ev, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('dragover');
+        });
+    });
+    ['dragleave', 'drop'].forEach(ev => {
+        dropZone.addEventListener(ev, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('dragover');
+        });
+    });
+    dropZone.addEventListener('drop', (e) => {
+        const files = Array.from(e.dataTransfer.files || []);
+        if (!files.length) return;
+        addFiles(files);
+    });
 
     form.addEventListener('submit', (e) => {
         const checked = form.querySelectorAll('input[name="participants"]:checked').length;
@@ -165,7 +451,23 @@
             alert("팀원 최소 3명을 선택해주세요. (본인 포함 4명 이상)");
             return;
         }
-        if (!confirm(confirmMessage)) { e.preventDefault(); }
+        const files = fileQueue;
+        const mode = form.dataset.mode || 'create';
+        const existingCount = parseInt(form.dataset.existingCount || '0', 10);
+        const effectiveCount = files.length > 0 ? files.length : existingCount;
+        if (effectiveCount === 0) {
+            e.preventDefault();
+            alert("사진 또는 동영상 최소 1개를 첨부해주세요.");
+            return;
+        }
+        if (effectiveCount > 5) {
+            e.preventDefault();
+            alert("첨부 파일은 최대 5개까지만 가능합니다.");
+            return;
+        }
+        if (!confirm(confirmMessage)) {
+            e.preventDefault();
+        }
     });
 
     {% if completed %}
