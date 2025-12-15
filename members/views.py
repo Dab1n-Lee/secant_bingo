@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from .forms import BingoSubmissionForm, LoginForm
@@ -57,7 +58,14 @@ def board_view(request):
     submissions_map = {s.bingo_item_id: s for s in submissions}
     team_members = Member.objects.filter(team=member.team).order_by("name")
     approved_count = sum(1 for s in submissions_map.values() if s.status == BingoSubmission.STATUS_APPROVED)
-    completed = bool(bingo_items) and approved_count == len(bingo_items)
+    approved_positions = {s.bingo_item.position for s in submissions if s.status == BingoSubmission.STATUS_APPROVED}
+    winning_lines = [
+        {1, 2, 3}, {4, 5, 6}, {7, 8, 9},  # 가로
+        {1, 4, 7}, {2, 5, 8}, {3, 6, 9},  # 세로
+        {1, 5, 9}, {3, 5, 7},  # 대각선
+    ]
+    bingo_line_completed = any(line.issubset(approved_positions) for line in winning_lines)
+    completed = bingo_line_completed
     board_data = [(item, submissions_map.get(item.id)) for item in bingo_items]
 
     submission_details = {}
@@ -70,6 +78,7 @@ def board_view(request):
             "title": s.title,
             "content": s.content,
             "status": s.status,
+            "rejected_reason": s.rejected_reason,
             "participants": [p.name for p in s.participants.all()],
             "participant_ids": [p.id for p in s.participants.all()],
             "attachments": attachments,
@@ -77,7 +86,23 @@ def board_view(request):
             "submitted_by_id": s.submitted_by_id,
             "item_title": s.bingo_item.title,
             "item_desc": s.bingo_item.description or "",
+            "item_position": s.bingo_item.position,
         }
+
+    # 팀 반려 알림(1회성)
+    rejected_submissions = [s for s in submissions if s.status == BingoSubmission.STATUS_REJECTED]
+    notified_ids = set(request.session.get("notified_rejections", []))
+    new_rejections = [s for s in rejected_submissions if s.id not in notified_ids]
+    if new_rejections:
+        for s in new_rejections:
+            reason = s.rejected_reason or "사유 없음"
+            messages.warning(
+                request,
+                f"{s.bingo_item.position}번 빙고가 반려되었습니다. 사유: {reason}",
+            )
+        request.session["notified_rejections"] = list(
+            notified_ids.union({s.id for s in rejected_submissions})
+        )
 
     return render(
         request,
@@ -87,11 +112,14 @@ def board_view(request):
             "board_data": board_data,
             "team_members": team_members,
             "completed": completed,
+            "bingo_line_completed": bingo_line_completed,
             "submission_details": submission_details,
         },
     )
 
 
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
 def logout_view(request):
     request.session.flush()
     messages.info(request, "로그아웃 되었습니다.")
@@ -111,6 +139,11 @@ def submit_bingo_item(request, item_id: int):
         return redirect("board")
 
     form = BingoSubmissionForm(request.POST, request.FILES, member=member)
+    # 모델 clean에서 bingo_item을 참조하므로 검증 전에 미리 설정해 준다.
+    form.instance.bingo_item = bingo_item
+    form.instance.team = member.team
+    form.instance.submitted_by = member
+
     if form.is_valid():
         submission: BingoSubmission = form.save(commit=False)
         submission.bingo_item = bingo_item
@@ -119,7 +152,9 @@ def submit_bingo_item(request, item_id: int):
         submission.status = BingoSubmission.STATUS_PENDING
         submission.save()
         form.save_m2m()
-        uploaded_files = request.FILES.getlist("attachments")
+        uploaded_files = form.cleaned_data.get("attachments") or request.FILES.getlist("attachments")
+        if not isinstance(uploaded_files, (list, tuple)):
+            uploaded_files = [uploaded_files] if uploaded_files else []
         for f in uploaded_files:
             BingoSubmissionAttachment.objects.create(submission=submission, file=f)
         messages.success(request, "제출이 완료되었어요. 승인 대기 상태입니다.")
@@ -142,6 +177,7 @@ def submit_bingo_item(request, item_id: int):
             "title": s.title,
             "content": s.content,
             "status": s.status,
+            "rejected_reason": s.rejected_reason,
             "participants": [p.name for p in s.participants.all()],
             "participant_ids": [p.id for p in s.participants.all()],
             "attachments": [
@@ -151,6 +187,7 @@ def submit_bingo_item(request, item_id: int):
             "submitted_by_id": s.submitted_by_id,
             "item_title": s.bingo_item.title,
             "item_desc": s.bingo_item.description or "",
+            "item_position": s.bingo_item.position,
         }
     return render(
         request,
@@ -161,6 +198,7 @@ def submit_bingo_item(request, item_id: int):
             "team_members": team_members,
             "form_errors": form.errors,
             "completed": False,
+            "bingo_line_completed": False,
             "submission_details": submission_details,
         },
     )
@@ -176,7 +214,7 @@ def update_submission(request, submission_id: int):
         BingoSubmission,
         id=submission_id,
         submitted_by=member,
-        status=BingoSubmission.STATUS_PENDING,
+        status__in=[BingoSubmission.STATUS_PENDING, BingoSubmission.STATUS_REJECTED],
     )
     existing_count = submission.attachments.count()
     form = BingoSubmissionForm(
@@ -192,7 +230,9 @@ def update_submission(request, submission_id: int):
         submission.save()
         submission.participants.set(form.cleaned_data["participants"])
 
-        uploaded_files = request.FILES.getlist("attachments")
+        uploaded_files = form.cleaned_data.get("attachments") or request.FILES.getlist("attachments")
+        if not isinstance(uploaded_files, (list, tuple)):
+            uploaded_files = [uploaded_files] if uploaded_files else []
         if uploaded_files:
             if submission.photo:
                 submission.photo.delete(save=False)
@@ -221,7 +261,7 @@ def cancel_submission(request, submission_id: int):
         BingoSubmission,
         id=submission_id,
         submitted_by=member,
-        status=BingoSubmission.STATUS_PENDING,
+        status__in=[BingoSubmission.STATUS_PENDING, BingoSubmission.STATUS_REJECTED],
     )
     if submission.photo:
         submission.photo.delete(save=False)

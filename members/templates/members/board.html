@@ -11,10 +11,12 @@
     .status-pill { align-self: flex-start; padding: 6px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; color: #fff; }
     .status-approved { background: linear-gradient(120deg, #1aa65a, #29c77b); }
     .status-pending { background: linear-gradient(120deg, #f7a000, #f77f00); }
+    .status-rejected { background: linear-gradient(120deg, #ef4444, #b91c1c); }
     .tile.pending { border-color: #ffd599; background: #fff7ea; }
     .tile.approved { border-color: #b8e5cb; background: #f0fff6; }
+    .tile.rejected { border-color: #f5b2b2; background: #fff2f2; }
     .modal-backdrop { position: fixed; inset: 0; background: rgba(8,19,46,0.45); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
-    .modal { width: min(680px, 100%); background: #fff; border-radius: 18px; box-shadow: 0 20px 50px rgba(8,24,68,0.3); padding: 22px; position: relative; }
+    .modal { width: min(680px, 100%); background: #fff; border-radius: 18px; box-shadow: 0 20px 50px rgba(8,24,68,0.3); padding: 22px; position: relative; max-height: 90vh; overflow-y: auto; }
     .modal h3 { margin: 0 0 6px; }
     .modal .subtitle { margin: 0 0 12px; }
     .modal-close { position: absolute; top: 12px; right: 12px; border: none; background: none; font-size: 20px; cursor: pointer; color: #4c5a78; }
@@ -36,12 +38,13 @@
     .modal-section { display: none; }
     .modal-section.active { display: block; }
     .section-title { font-size: 14px; font-weight: 800; color: #1f2f55; margin: 14px 0 6px; }
-    .attachment-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 6px; }
+    .attachment-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
     .attachment-card { border: 1px solid #dfe5f5; border-radius: 12px; overflow: hidden; background: #f7f9ff; position: relative; }
-    .attachment-thumb { width: 100%; height: 120px; object-fit: cover; display: block; background: #e6ecfa; }
+    .attachment-thumb { width: 100%; height: 90px; object-fit: cover; display: block; background: #e6ecfa; }
     .attachment-meta { padding: 8px; font-size: 12px; color: #4d5a75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #fff; }
     .pill.pending { background: linear-gradient(120deg, #f7a000, #f77f00); }
+    .pill.rejected { background: linear-gradient(120deg, #ef4444, #b91c1c); }
     .participant-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
     .participant-chip { background: #eef2ff; color: #2a3f7c; padding: 6px 10px; border-radius: 12px; font-weight: 700; font-size: 13px; }
     .drop-zone { border: 2px dashed #b5c6f3; border-radius: 14px; padding: 14px; text-align: center; background: #f5f7ff; transition: border-color .12s ease, background .12s ease; cursor: pointer; }
@@ -50,6 +53,33 @@
     .btn-ghost { border: 1px dashed #2f6bff; background: #fff; color: #1b3a7a; }
     .remove-chip { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-weight: 800; }
     @keyframes fall { to { transform: translateY(110vh) rotate(360deg); opacity: 0.2; } }
+    .history-bar { margin-top: 24px; display: flex; justify-content: flex-end; }
+    .history-btn { border: 1px solid var(--border); background: #fff; color: #1c2f58; padding: 10px 14px; border-radius: 12px; cursor: pointer; box-shadow: var(--shadow); font-weight: 700; }
+    .history-modal { width: min(720px, 100%); background: #fff; border-radius: 18px; box-shadow: 0 20px 50px rgba(8,24,68,0.3); padding: 20px; position: relative; }
+    .history-list { max-height: 60vh; overflow: auto; margin-top: 12px; display: grid; gap: 10px; }
+    .history-card { border: 1px solid #e3e8f5; border-radius: 12px; padding: 12px; background: #f7f9ff; display: grid; gap: 6px; }
+    .history-status { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; font-size: 13px; }
+    .history-status .dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+    .bingo-toast {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        pointer-events: none; z-index: 70;
+    }
+    .bingo-toast .card {
+        background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.95), rgba(235,243,255,0.95));
+        padding: 24px 32px; border-radius: 18px; box-shadow: 0 20px 80px rgba(18,34,68,0.25);
+        text-align: center; transform: scale(0.9); opacity: 0; animation: toast-pop 0.5s ease forwards;
+        border: 1px solid #e2e8ff;
+    }
+    .bingo-toast h2 { margin: 0 0 6px; color: #0f1a2d; font-size: 22px; }
+    .bingo-toast p { margin: 0; color: #4d5a75; }
+    .bingo-toast .glow {
+        position: absolute; inset: 0; background: radial-gradient(circle, rgba(53,114,255,0.12), transparent 60%);
+        filter: blur(20px); z-index: -1;
+    }
+    @keyframes toast-pop {
+        from { transform: translateY(20px) scale(0.9); opacity: 0; }
+        to { transform: translateY(0) scale(1); opacity: 1; }
+    }
 </style>
 {% endblock %}
 
@@ -71,7 +101,7 @@
         <div class="board-grid">
             {% for item, submission in board_data %}
                 {% with status=submission.status|default_if_none:"" %}
-                <div class="tile {% if status == 'pending' %}pending{% elif status == 'approved' %}approved{% endif %}"
+                <div class="tile {% if status == 'pending' %}pending{% elif status == 'approved' %}approved{% elif status == 'rejected' %}rejected{% endif %}"
                      data-item-id="{{ item.id }}"
                      data-submission-id="{{ submission.id|default_if_none:'' }}"
                      data-title="{{ item.title }}"
@@ -84,8 +114,11 @@
                     {% endif %}
                     {% if status %}
                         <span class="status-pill status-{{ status }}">
-                            {% if status == "pending" %}검토중{% else %}승인됨{% endif %}
+                            {% if status == "pending" %}검토중{% elif status == "approved" %}승인{% else %}반려{% endif %}
                         </span>
+                        {% if status == "rejected" and submission.rejected_reason %}
+                            <div style="color: #b91c1c; font-size: 13px;">사유: {{ submission.rejected_reason }}</div>
+                        {% endif %}
                     {% endif %}
                 </div>
                 {% endwith %}
@@ -98,13 +131,18 @@
     {% endif %}
 </div>
 
+<div class="history-bar">
+    <button type="button" class="history-btn" id="history-btn">조 빙고 제출 이력</button>
+</div>
+
 <div class="modal-backdrop" id="submission-backdrop">
     <div class="modal">
         <button class="modal-close" type="button" id="modal-close">×</button>
         <h3 id="modal-title">활동 인증</h3>
         <p class="subtitle" id="modal-desc"></p>
         <div id="pending-detail" class="modal-section">
-            <span class="pill pending">검토중</span>
+            <span class="pill pending" id="detail-status-pill">검토중</span>
+            <div id="detail-reason" class="helper" style="display:none; color:#b91c1c;"></div>
             <div class="section-title">내가 제출한 내용</div>
             <div id="detail-content" style="white-space: pre-wrap; line-height: 1.5; color: #1f2f55;"></div>
             <div class="section-title">첨부한 파일</div>
@@ -167,6 +205,15 @@
     </div>
 </div>
 
+<div class="modal-backdrop" id="history-backdrop">
+    <div class="history-modal">
+        <button class="modal-close" type="button" id="history-close">×</button>
+        <h3 style="margin:0;">조 빙고 제출 이력</h3>
+        <p class="subtitle" style="margin-bottom:8px;">현재 팀에서 제출한 빙고 항목의 상태를 볼 수 있습니다.</p>
+        <div class="history-list" id="history-list"></div>
+    </div>
+</div>
+
 {{ submission_details|json_script:"submission-data" }}
 
 <script>
@@ -184,6 +231,8 @@
     const detailContent = document.getElementById('detail-content');
     const detailAttachments = document.getElementById('detail-attachments');
     const detailParticipants = document.getElementById('detail-participants');
+    const detailStatusPill = document.getElementById('detail-status-pill');
+    const detailReason = document.getElementById('detail-reason');
     const detailEditBtn = document.getElementById('detail-edit-btn');
     const detailCancelBtn = document.getElementById('detail-cancel-btn');
     const cancelForm = document.getElementById('cancel-form');
@@ -194,12 +243,18 @@
     const submitBtn = document.getElementById('submit-btn-text');
     const dropZone = document.getElementById('drop-zone');
     const fileSelectBtn = document.getElementById('file-select-btn');
+    const historyBtn = document.getElementById('history-btn');
+    const historyBackdrop = document.getElementById('history-backdrop');
+    const historyClose = document.getElementById('history-close');
+    const historyList = document.getElementById('history-list');
+    const bingoLineCompleted = {{ bingo_line_completed|yesno:"true,false" }};
     const confirmMessage = "인스타그램에 cogsciin 을 태그해서 인증샷 스토리로 올려주시고 문화부장에게 확인 요청 하시면 바로 승인해드리겠습니다!";
 
     let activeItemId = null;
     let activeSubmissionId = null;
     let currentDetail = null;
     let fileQueue = [];
+    const supportsDataTransfer = typeof DataTransfer !== "undefined";
 
     function showSection(target) {
         [formSection, detailSection].forEach(section => section.classList.remove('active'));
@@ -286,6 +341,10 @@
     }
 
     function syncInputFiles() {
+        if (!supportsDataTransfer) {
+            // 일부 브라우저는 input.files 할당을 막으므로 그대로 둔다.
+            return;
+        }
         const dt = new DataTransfer();
         fileQueue.forEach(f => dt.items.add(f));
         attachmentInput.files = dt.files;
@@ -308,6 +367,80 @@
         fileQueue = fileQueue.concat(newFiles);
         syncInputFiles();
         renderSelectedPreviews(fileQueue);
+    }
+
+    function setDetailStatus(status, reason) {
+        const label = status === 'approved' ? '승인' : status === 'rejected' ? '반려' : '검토중';
+        detailStatusPill.textContent = label;
+        detailStatusPill.className = `pill ${status}`;
+        if (status === 'rejected' && reason) {
+            detailReason.style.display = 'block';
+            detailReason.textContent = `반려 사유: ${reason}`;
+        } else {
+            detailReason.style.display = 'none';
+            detailReason.textContent = '';
+        }
+    }
+
+    function historyStatusLabel(status) {
+        if (status === 'approved') return { label: '승인', color: '#1aa65a' };
+        if (status === 'rejected') return { label: '반려', color: '#ef4444' };
+        return { label: '검토중', color: '#f59e0b' };
+    }
+
+    function renderHistory() {
+        const entries = Object.values(submissionData || {}).sort(
+            (a, b) => (a.item_position || 0) - (b.item_position || 0)
+        );
+        historyList.innerHTML = '';
+        if (!entries.length) {
+            historyList.innerHTML = '<div class="helper">아직 제출한 빙고가 없습니다.</div>';
+            return;
+        }
+        entries.forEach((item) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'history-card';
+            const statusMeta = historyStatusLabel(item.status);
+            wrap.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <strong>#${item.item_position} ${item.item_title}</strong>
+                    <span class="history-status" style="color:${statusMeta.color};">
+                        <span class="dot" style="background:${statusMeta.color};"></span>${statusMeta.label}
+                    </span>
+                </div>
+                <div style="color:#4d5a75;">${item.content || ''}</div>
+                ${item.status === 'rejected' ? `<div style="color:#b91c1c; font-size:13px;">반려 사유: ${item.rejected_reason || '사유 없음'}</div>` : ''}
+            `;
+            historyList.appendChild(wrap);
+        });
+    }
+
+    function launchConfetti() {
+        const colors = ["#ff5f6d", "#ffc371", "#2af598", "#22d3ee", "#a78bfa"];
+        for (let i = 0; i < 120; i++) {
+            const el = document.createElement('div');
+            el.className = 'confetti-piece';
+            el.style.left = Math.random() * 100 + 'vw';
+            el.style.setProperty('--confetti-color', colors[i % colors.length]);
+            el.style.animationDelay = (Math.random() * 0.8) + 's';
+            el.style.transform = `rotate(${Math.random() * 360}deg)`;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 3200);
+        }
+    }
+
+    function showBingoToast() {
+        const toast = document.createElement('div');
+        toast.className = 'bingo-toast';
+        toast.innerHTML = `
+            <div class="card">
+                <div class="glow"></div>
+                <h2>축하합니다! 빙고를 완성하셨습니다!</h2>
+                <p>한 줄을 채웠어요. 팀원들과 함께 자축하세요!</p>
+            </div>
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2400);
     }
 
     function closeModal() {
@@ -360,6 +493,7 @@
         const isOwner = data.submitted_by_id === currentMemberId;
         modalTitle.textContent = data.item_title;
         modalDesc.textContent = data.item_desc || "제출한 내용을 확인할 수 있습니다.";
+        setDetailStatus(data.status, data.rejected_reason || "");
         detailContent.textContent = data.content;
         renderAttachments(detailAttachments, data.attachments || []);
         detailParticipants.innerHTML = '';
@@ -386,7 +520,7 @@
         tile.addEventListener('click', () => {
             const status = tile.dataset.status;
             const itemId = tile.dataset.itemId;
-            if (status === 'pending') {
+            if (status === 'pending' || status === 'rejected' || status === 'approved') {
                 const data = getSubmission(itemId);
                 if (data) {
                     openDetail(itemId, data);
@@ -421,7 +555,11 @@
     attachmentInput.addEventListener('change', () => {
         const files = Array.from(attachmentInput.files || []);
         addFiles(files);
-        attachmentInput.value = '';
+        // DataTransfer가 없는 브라우저에서는 실제 input.files를 그대로 유지해야 업로드가 전송된다.
+        if (!supportsDataTransfer) {
+            fileQueue = Array.from(attachmentInput.files || []);
+            renderSelectedPreviews(fileQueue);
+        }
     });
 
     ['dragenter', 'dragover'].forEach(ev => {
@@ -442,9 +580,29 @@
         const files = Array.from(e.dataTransfer.files || []);
         if (!files.length) return;
         addFiles(files);
+        if (!supportsDataTransfer) {
+            // DataTransfer 할당이 불가한 환경에서는 드롭한 파일을 그대로 input에 반영
+            attachmentInput.files = e.dataTransfer.files;
+            fileQueue = Array.from(attachmentInput.files || []);
+            renderSelectedPreviews(fileQueue);
+        }
     });
 
+    historyBtn.addEventListener('click', () => {
+        renderHistory();
+        historyBackdrop.style.display = 'flex';
+    });
+    historyClose.addEventListener('click', () => { historyBackdrop.style.display = 'none'; });
+    historyBackdrop.addEventListener('click', (e) => { if (e.target === historyBackdrop) historyBackdrop.style.display = 'none'; });
+
     form.addEventListener('submit', (e) => {
+        // 제출 직전 파일을 재동기화해 전송 누락을 방지
+        if (fileQueue.length) {
+            syncInputFiles();
+        } else if (!supportsDataTransfer) {
+            fileQueue = Array.from(attachmentInput.files || []);
+        }
+
         const checked = form.querySelectorAll('input[name="participants"]:checked').length;
         if (checked < 3) {
             e.preventDefault();
@@ -470,21 +628,9 @@
         }
     });
 
-    {% if completed %}
-    (function confetti() {
-        const colors = ["#ff5f6d", "#ffc371", "#2af598", "#22d3ee", "#a78bfa"];
-        for (let i = 0; i < 80; i++) {
-            const el = document.createElement('div');
-            el.className = 'confetti-piece';
-            el.style.left = Math.random() * 100 + 'vw';
-            el.style.setProperty('--confetti-color', colors[i % colors.length]);
-            el.style.animationDelay = (Math.random() * 0.5) + 's';
-            el.style.transform = `rotate(${Math.random() * 360}deg)`;
-            document.body.appendChild(el);
-            setTimeout(() => el.remove(), 3000);
-        }
-        alert("빙고가 완성되었습니다!");
-    })();
-    {% endif %}
+    if (bingoLineCompleted) {
+        launchConfetti();
+        showBingoToast();
+    }
 </script>
 {% endblock %}

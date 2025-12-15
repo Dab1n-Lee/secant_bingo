@@ -7,9 +7,28 @@ class MultiFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
 
+class MultiFileField(forms.FileField):
+    """
+    multiple 업로드를 리스트로 처리하는 FileField 변형
+    """
+
+    def to_python(self, data):
+        if not data:
+            return []
+        if isinstance(data, (list, tuple)):
+            return list(data)
+        # 단일 파일도 리스트로 감싸 반환
+        return [super().to_python(data)]
+
+
 class LoginForm(forms.Form):
     student_id = forms.CharField(label="학번", max_length=20)
-    phone_last4 = forms.CharField(label="전화번호 뒷자리", min_length=4, max_length=4)
+    phone_last4 = forms.CharField(
+        label="전화번호 뒷자리",
+        min_length=4,
+        max_length=4,
+        widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "off"}),
+    )
 
     def clean_phone_last4(self):
         last4 = self.cleaned_data["phone_last4"]
@@ -19,7 +38,7 @@ class LoginForm(forms.Form):
 
 
 class BingoSubmissionForm(forms.ModelForm):
-    attachments = forms.FileField(
+    attachments = MultiFileField(
         label="첨부 파일",
         required=False,
         widget=MultiFileInput(attrs={"multiple": True, "accept": "image/*,video/*"}),
@@ -46,7 +65,9 @@ class BingoSubmissionForm(forms.ModelForm):
         if total_people < 4:
             raise forms.ValidationError("본인을 포함해 최소 4명이 참여해야 합니다.")
 
-        files = self.files.getlist("attachments") if self.files else []
+        files = cleaned.get("attachments") or []
+        if not isinstance(files, (list, tuple)):
+            files = [files]
         file_count = len(files)
         existing_count = self.existing_attachment_count or 0
         effective_count = file_count if file_count > 0 else existing_count

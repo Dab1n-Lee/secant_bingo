@@ -4,7 +4,7 @@
 <style>
     .login-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 14px; }
     form label { display: block; font-weight: 700; margin-bottom: 6px; }
-    input[type="text"] { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #cdd6eb; font-size: 15px; background: #f7f9ff; }
+    input[type="text"], input[type="password"] { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #cdd6eb; font-size: 15px; background: #f7f9ff; }
     button[type="submit"] { width: 100%; margin-top: 12px; padding: 13px; border: none; border-radius: 12px; background: linear-gradient(120deg, #163a8c, #3572ff); color: #fff; font-weight: 800; letter-spacing: 0.3px; cursor: pointer; box-shadow: 0 10px 20px rgba(34, 78, 181, 0.2); }
     .pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; background: #eef3ff; color: #14325d; font-size: 13px; font-weight: 700; margin-right: 8px; }
     .teams { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -53,4 +53,11 @@
         </div>
     </div>
 </div>
+{% if form.errors or form.non_field_errors %}
+<script>
+    alert("학번 또는 전화번호 뒷자리가 올바르지 않습니다. 다시 확인해주세요.");
+    const pwd = document.getElementById("{{ form.phone_last4.id_for_label }}");
+    if (pwd) pwd.value = "";
+</script>
+{% endif %}
 {% endblock %}

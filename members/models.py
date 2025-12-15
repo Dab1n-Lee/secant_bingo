@@ -65,9 +65,11 @@ class BingoItem(models.Model):
 class BingoSubmission(models.Model):
     STATUS_PENDING = "pending"
     STATUS_APPROVED = "approved"
+    STATUS_REJECTED = "rejected"
     STATUS_CHOICES = [
         (STATUS_PENDING, "검토중"),
         (STATUS_APPROVED, "승인"),
+        (STATUS_REJECTED, "반려"),
     ]
 
     team = models.CharField(
@@ -93,6 +95,7 @@ class BingoSubmission(models.Model):
     title = models.CharField(max_length=100)
     content = models.TextField()
     photo = models.FileField(upload_to="bingo_photos/", null=True, blank=True)
+    rejected_reason = models.TextField(blank=True, default="")
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
